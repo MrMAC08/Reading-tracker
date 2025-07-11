@@ -1,0 +1,156 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Continuous Line Tracker</title>
+<style>
+  body{font-family:Arial, sans-serif;background:#f2f4f8;padding:24px;text-align:center;}
+  h1{margin-top:0}
+  textarea{width:100%;max-width:700px;height:120px;font-size:17px;}
+  .controls{margin-top:10px}
+  .controls button,.controls input[type=range]{font-size:16px;padding:8px 14px;margin:4px}
+  #displayBox{position:relative;max-width:700px;margin:40px auto 0;background:#fff;
+              border:1px solid #ccc;padding:26px 18px;overflow-y:auto;height:260px}
+  #display{font-size:30px;line-height:1.6;text-align:left;word-wrap:break-word}
+  .word{display:inline-block;margin:0 4px;position:relative}
+  #tracker{position:absolute;height:4px;background:red;left:0;width:0;top:0;}
+  .highlight{background:#ffff93}
+</style>
+</head>
+<body>
+<h1>📖 Continuous Line Tracker</h1>
+
+<textarea id="inputText" placeholder="Paste text here…"></textarea>
+
+<div class="controls">
+  <label>Speed (ms / word): <span id="speedVal">500</span></label><br>
+  <input type="range" id="speed" min="100" max="2000" step="50" value="500">
+  <button id="startBtn">▶️ Start</button>
+  <button id="pauseBtn" disabled>⏸️ Pause</button>
+  <button id="resetBtn" disabled>⏹️ Reset</button>
+</div>
+
+<div id="displayBox">
+  <div id="display"></div>
+  <div id="tracker"></div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const input = $('inputText');
+  const display = $('display');
+  const tracker = $('tracker');
+  const speedSlider = $('speed');
+  const speedLbl = $('speedVal');
+  const startBtn = $('startBtn');
+  const pauseBtn = $('pauseBtn');
+  const resetBtn = $('resetBtn');
+  const box = $('displayBox');
+
+  speedSlider.oninput = () => speedLbl.textContent = speedSlider.value;
+
+  let words = [], current = 0, running = false, timer = null;
+  let prevTop = null, lineStartLeft = 0;
+
+  function step() {
+    if (!running) return;
+    if (current >= words.length) { finish(); return; }
+
+    const el = $('word-' + current);
+    const left = el.offsetLeft;
+    const top = el.offsetTop;
+    const right = left + el.offsetWidth;
+
+    // highlight current word
+    
+    
+
+    // line reset when new line starts
+    if (prevTop === null || top !== prevTop) {
+      tracker.style.transition = 'none';               // instant move
+      tracker.style.left = left + 'px';
+      tracker.style.top = (top + el.offsetHeight) + 'px';
+      tracker.style.width = '0px';
+      lineStartLeft = left;
+      // force reflow so next transition applies
+      void tracker.offsetWidth;
+    }
+
+    prevTop = top;
+
+    // Animate width growth
+    const baseSpeed = parseInt(speedSlider.value);
+    const wordText = el.innerText;
+    let extra = /[.!?]$/.test(wordText) ? 600 : /[,;:]$/.test(wordText) ? 300 : 0;
+    const duration = baseSpeed + extra;
+
+    tracker.style.transition = `width ${baseSpeed}ms linear`;
+    const newWidth = right - lineStartLeft;
+    tracker.style.width = newWidth + 'px';
+
+    // auto-scroll
+    const trackerBottom = top + el.offsetHeight;
+    if (trackerBottom - box.scrollTop > box.clientHeight - 60) {
+      box.scrollTop = trackerBottom - box.clientHeight + 60;
+    }
+
+    current++;
+    
+    timer = setTimeout(() => {
+      if (extra > 0) {
+        setTimeout(step, extra);
+      } else {
+        step();
+      }
+    }, baseSpeed);
+    
+  }
+
+  function start() {
+    if (running) return;
+    if (!words.length) {
+      const text = input.value.trim();
+      if (!text) return;
+      words = text.split(/\s+/);
+      display.innerHTML = words.map((w,i)=>'<span class="word" id="word-'+i+'">'+w+'</span>').join(' ');
+      tracker.style.display = 'block';
+    }
+    running = true;
+    startBtn.disabled = true;
+    pauseBtn.disabled = false;
+    resetBtn.disabled = false;
+    step();
+  }
+
+  function pause() {
+    running = false;
+    clearTimeout(timer);
+    startBtn.disabled = false;
+    pauseBtn.disabled = true;
+  }
+
+  function reset() {
+    running = false;
+    clearTimeout(timer);
+    words = [];
+    current = 0;
+    prevTop = null;
+    display.innerHTML = '';
+    tracker.style.display = 'none';
+    tracker.style.width = '0px';
+    startBtn.disabled = false;
+    pauseBtn.disabled = true;
+    resetBtn.disabled = true;
+  }
+
+  function finish() { pause(); }
+
+  startBtn.onclick = start;
+  pauseBtn.onclick = pause;
+  resetBtn.onclick = reset;
+})();
+</script>
+</body>
+</html>
